@@ -18,7 +18,7 @@ def survey_list(request):
 
 @login_required
 def detail(request, pk):
-    """User can view an active survey"""
+    """Пользователь может посмотреть результаты опросника"""
     try:
         survey = Survey.objects.prefetch_related("question_set__option_set").get(
             pk=pk, creator=request.user, is_active=True
@@ -26,18 +26,40 @@ def detail(request, pk):
     except Survey.DoesNotExist:
         raise Http404()
 
-    questions = survey.question_set.all()
+    questions = survey.question_set.all()  # В переменную question заносится все вопросы из опросника
 
-    # Calculate the results.
-    # This is a naive implementation and it could be optimised to hit the database less.
-    # See here for more info on how you might improve this code: https://docs.djangoproject.com/en/3.1/topics/db/aggregation/
+    # Организуется подсчет процентов по опроснику
+    # Организуется поиск максимального ответа по числу голосов
+    # Организуется поиск минимального ответа по числу голосов
+    max_percent = -1  # Переменная чтобы найти ответ с максимальным колвом голосов
+    max_answer = ["You don't choose anything",
+                  ""]  # Массив из 2-ух элементов: 1ый элемент сам вопрос, 2ой ответ на него
+    max_answers = []  # Все вопрсоы и ответы которые были получены при поиске максимума
+    for question in questions:
+        option_pks = question.option_set.values_list("pk", flat=True)
+        total_answers = Answer.objects.filter(option_id__in=option_pks).count()
+        for option in question.option_set.all():  # Для текущего вопроса прогоняет варианты ответов
+            num_answers = Answer.objects.filter(option=option).count()
+            option.percent = 100.0 * num_answers / total_answers if total_answers else 0  # Параметр у варианта ответа который показывает соотн. выбранных голосов ко всем
+            if option.percent > max_percent:  # Если процент у текущего процента больше чем у максимально-выбираемого ответа в данном вопросе
+                max_percent = option.percent  # Максимальный выбранный ответ присваиваем в параметр
+                max_answer = [question.prompt, option.text]  # Запонинаем вопрос и ответ
+        max_answers.append(max_answer)  # заносится сюда максильно выбранный ответ и вопрос
+        max_percent = -1
+    min_percent = 101
+    min_answer = ["You don't choose anything", ""]
+    min_answers = []
     for question in questions:
         option_pks = question.option_set.values_list("pk", flat=True)
         total_answers = Answer.objects.filter(option_id__in=option_pks).count()
         for option in question.option_set.all():
             num_answers = Answer.objects.filter(option=option).count()
             option.percent = 100.0 * num_answers / total_answers if total_answers else 0
-
+            if option.percent < min_percent:
+                min_percent = option.percent
+                min_answer = [question.prompt, option.text]
+        min_answers.append(min_answer)
+        min_percent = 101
     host = request.get_host()
     public_path = reverse("survey-start", args=[pk])
     public_url = f"{request.scheme}://{host}{public_path}"
@@ -50,6 +72,8 @@ def detail(request, pk):
             "public_url": public_url,
             "questions": questions,
             "num_submissions": num_submissions,
+            "max_answers": max_answers,
+            "min_answers": min_answers
         },
     )
 

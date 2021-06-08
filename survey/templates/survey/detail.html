@@ -21,5 +21,29 @@
         </ul>
     </div>
     {% endfor %}
+    <div class="ui basic padded segment left aligned">
+        <h3 class="ui header">Результат по методу большинства:</h3>
+        <ul>
+            {% for row in max_answers %}
+          <tr>
+            {% for cell in row %} # Выводит поочередно вопрос и ответ
+              <li>{{ cell }}</li>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+        </ul>
+    </div>
+    <div class="ui basic padded segment left aligned">
+            <h3 class="ui header">Результат по методу меньшинства:</h3>
+            <ul>
+                {% for row in min_answers %}
+              <tr>
+                {% for cell in row %}
+                  <li>{{ cell }}</li>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+            </ul>
+        </div>
 </div>
 {% endblock %}
