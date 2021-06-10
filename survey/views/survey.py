@@ -50,7 +50,7 @@ def detail(request, pk):
             weight = Answer.objects.filter(option=option) # запрос показывающий веса вопроса
             for el in weight: # для каждого голоса в текущем вопросе
                 if el.power_of_choice > allweight: # если вес голоса больше, то голос с максимальным весом меняется
-                    allweight = el.power_of_choice
+                    allweight = el.power_of_choice # power_of_choice поле в таблице Answer
                     total_weight = [question.prompt, option.text] # вариант ответа с максимальным голосом на текущем этапе
             option.percent = 100.0 * num_answers / total_answers if total_answers else 0  # Параметр у варианта ответа который показывает соотн. выбранных голосов ко всем
             if option.percent > max_percent:  # Если процент у текущего процента больше чем у максимально-выбираемого ответа в данном вопросе
