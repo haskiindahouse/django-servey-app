@@ -4,10 +4,11 @@ from django.contrib.auth.decorators import login_required
 from django.forms.formsets import formset_factory
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
+from django import forms
 
 from ..models import Survey, Question, Answer, Submission
-from ..forms import SurveyForm, QuestionForm, OptionForm, AnswerForm, BaseAnswerFormSet
-
+from ..forms import SurveyForm, QuestionForm, OptionForm, AnswerForm, BaseAnswerFormSet, PowerOfChoiceForm
+from django.db.models import Max
 
 @login_required
 def survey_list(request):
@@ -35,31 +36,36 @@ def detail(request, pk):
     max_answer = ["You don't choose anything",
                   ""]  # Массив из 2-ух элементов: 1ый элемент сам вопрос, 2ой ответ на него
     max_answers = []  # Все вопрсоы и ответы которые были получены при поиске максимума
+    min_percent = 101
+    min_answer = ["You don't choose anything", ""]
+    min_answers = []
+    dictator = []
+    total_weight = ["You don't choose anything", ""]
+    allweight = 0
     for question in questions:
         option_pks = question.option_set.values_list("pk", flat=True)
         total_answers = Answer.objects.filter(option_id__in=option_pks).count()
         for option in question.option_set.all():  # Для текущего вопроса прогоняет варианты ответов
             num_answers = Answer.objects.filter(option=option).count()
+            weight = Answer.objects.filter(option=option) # запрос показывающий веса вопроса
+            for el in weight: # для каждого голоса в текущем вопросе
+                if el.power_of_choice > allweight: # если вес голоса больше, то голос с максимальным весом меняется
+                    allweight = el.power_of_choice
+                    total_weight = [question.prompt, option.text] # вариант ответа с максимальным голосом на текущем этапе
             option.percent = 100.0 * num_answers / total_answers if total_answers else 0  # Параметр у варианта ответа который показывает соотн. выбранных голосов ко всем
             if option.percent > max_percent:  # Если процент у текущего процента больше чем у максимально-выбираемого ответа в данном вопросе
                 max_percent = option.percent  # Максимальный выбранный ответ присваиваем в параметр
                 max_answer = [question.prompt, option.text]  # Запонинаем вопрос и ответ
-        max_answers.append(max_answer)  # заносится сюда максильно выбранный ответ и вопрос
-        max_percent = -1
-    min_percent = 101
-    min_answer = ["You don't choose anything", ""]
-    min_answers = []
-    for question in questions:
-        option_pks = question.option_set.values_list("pk", flat=True)
-        total_answers = Answer.objects.filter(option_id__in=option_pks).count()
-        for option in question.option_set.all():
-            num_answers = Answer.objects.filter(option=option).count()
-            option.percent = 100.0 * num_answers / total_answers if total_answers else 0
             if option.percent < min_percent:
                 min_percent = option.percent
                 min_answer = [question.prompt, option.text]
+        dictator.append(total_weight)  # Формирует общие ответы
+        allweight = 0
         min_answers.append(min_answer)
         min_percent = 101
+        max_answers.append(max_answer)  # заносится сюда максильно выбранный ответ и вопрос
+        max_percent = -1
+
     host = request.get_host()
     public_path = reverse("survey-start", args=[pk])
     public_url = f"{request.scheme}://{host}{public_path}"
@@ -73,7 +79,8 @@ def detail(request, pk):
             "questions": questions,
             "num_submissions": num_submissions,
             "max_answers": max_answers,
-            "min_answers": min_answers
+            "min_answers": min_answers,
+            "dictator": dictator
         },
     )
 
@@ -196,7 +203,7 @@ def submit(request, survey_pk, sub_pk):
             with transaction.atomic():
                 for form in formset:
                     Answer.objects.create(
-                        option_id=form.cleaned_data["option"], submission_id=sub_pk,
+                        option_id=form.cleaned_data["option"], submission_id=sub_pk, power_of_choice=form.cleaned_data["power"]
                     )
 
                 sub.is_complete = True
@@ -205,7 +212,6 @@ def submit(request, survey_pk, sub_pk):
 
     else:
         formset = AnswerFormSet(form_kwargs=form_kwargs)
-
     question_forms = zip(questions, formset)
     return render(
         request,

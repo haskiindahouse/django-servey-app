@@ -14,6 +14,14 @@
 </style>
 <div class="ui center aligned basic very padded segment">
     <h1 class="ui header dividing">Your answers to {{ survey.title }}</h1>
+    <h2 class="ui header dividing">Power of choice</h2>
+                    <div>
+                     {% for field in pwc %}
+                         <label>
+                            <input type="radio" name="group1"> {{field}}
+                         </label>
+                     {% endfor %}
+                    </div>
     <form method="post" novalidate>
         {% csrf_token %}
         {{ formset.management_form }}

@@ -39,3 +39,5 @@ class Answer(models.Model):
 
     submission = models.ForeignKey(Submission, on_delete=models.CASCADE)
     option = models.ForeignKey(Option, on_delete=models.CASCADE)
+    # добавили силу голоса участника
+    power_of_choice = models.IntegerField(default=1)
